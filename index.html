@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aventura Inka en Cusco 3D | 3 minijuegos</title>
+  <style>
+    :root{
+      --gold:#ffd166;--gold2:#f6a91a;--red:#9b1b30;--red2:#5d101f;--blue:#0f3d73;--cream:#fff5cc;--dark:#2a1207;--ink:#2b1708;--green:#2d7d42;
+      --glass:rgba(20,31,54,.70);--stroke:rgba(255,228,129,.92);--shadow:rgba(0,0,0,.38);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:100%;height:100%;overflow:hidden;background:#091322;color:#fff;font-family:"Trebuchet MS",Arial,sans-serif}
+    button{font:inherit} img{user-select:none;-webkit-user-drag:none}
+    #game{position:relative;width:100vw;height:100vh;overflow:hidden;background:#061628;isolation:isolate}
+
+    /* ===== BASE SCENE ===== */
+    .scene{position:absolute;inset:0;overflow:hidden;background:linear-gradient(180deg,#75c8ff 0%,#89d8ff 45%,#315b35 100%)}
+    #bg{position:absolute;inset:-5vh -60vw;background:url("assets/fondo_cusco_3d.png") center bottom/cover no-repeat;filter:saturate(1.12) contrast(1.04) brightness(1.03);will-change:transform}
+    .sunGlow{position:absolute;inset:0;background:radial-gradient(circle at 12% 16%,rgba(255,235,140,.72),transparent 18%),radial-gradient(circle at 84% 22%,rgba(255,217,93,.18),transparent 22%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 25%,rgba(0,0,0,.13));mix-blend-mode:screen;pointer-events:none}
+    .mist{position:absolute;left:-15vw;right:-15vw;bottom:12vh;height:22vh;background:radial-gradient(ellipse at 10% 60%,rgba(255,255,255,.25),transparent 34%),radial-gradient(ellipse at 35% 50%,rgba(255,255,255,.2),transparent 28%),radial-gradient(ellipse at 65% 60%,rgba(255,255,255,.18),transparent 30%),radial-gradient(ellipse at 90% 50%,rgba(255,255,255,.22),transparent 34%);filter:blur(11px);animation:mistMove 14s ease-in-out infinite alternate;pointer-events:none}
+    @keyframes mistMove{from{transform:translateX(-2vw)}to{transform:translateX(3vw)}}
+    .screen{position:absolute;inset:0;display:none;z-index:90}.screen.active{display:block}
+
+    /* ===== WORLD / ADVENTURE ===== */
+    #world{position:absolute;left:0;top:0;width:5000px;height:100%;will-change:transform}
+    .ground{position:absolute;left:0;right:0;bottom:0;height:122px;background:linear-gradient(180deg,#6bbf44 0 18px,#7a5b34 18px 100%),repeating-linear-gradient(90deg,transparent 0 58px,rgba(255,255,255,.06) 58px 62px);border-top:4px solid rgba(255,243,173,.8);box-shadow:0 -16px 40px rgba(0,0,0,.25) inset}
+    .pathStripe{position:absolute;left:0;right:0;bottom:77px;height:34px;background:linear-gradient(180deg,rgba(255,230,140,.10),rgba(0,0,0,.08))}
+    .platform{position:absolute;height:40px;border-radius:18px;background:linear-gradient(180deg,#c6ab80,#7d6851 52%,#4e4034 100%);border:3px solid rgba(255,243,190,.70);box-shadow:0 12px 0 rgba(58,39,24,.95),0 18px 28px rgba(0,0,0,.30),0 6px 12px rgba(255,255,255,.22) inset;overflow:visible}
+    .platform::before{content:"";position:absolute;inset:0;border-radius:15px;background:linear-gradient(90deg,transparent 0 42px,rgba(75,55,38,.45) 42px 46px),linear-gradient(180deg,rgba(255,255,255,.20),transparent 45%);background-size:92px 40px,100% 100%}
+    .platformLabel{display:none}
+    .landmark{display:none}
+    .landmark::before{content:"✦";position:absolute;left:16px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#f7b323;color:#6b101f;box-shadow:0 0 14px rgba(255,214,66,.80)}
+    .landmark strong{display:block;font-size:16px;text-shadow:0 2px #000}.landmark small{display:block;font-size:12px;line-height:1.2;opacity:.92;margin-top:2px}
+    #hero{position:absolute;width:auto;height:188px;left:0;top:0;z-index:25;object-fit:contain;filter:drop-shadow(0 18px 13px rgba(0,0,0,.38));transform-origin:50% 100%;pointer-events:none}
+    #hero.running{animation:runBounce .16s infinite alternate ease-in-out}#hero.jump{animation:jumpPulse .45s infinite ease-in-out}#hero.happy{animation:happyWin .75s infinite alternate ease-in-out}
+    @keyframes runBounce{from{translate:0 0;rotate:-1deg}to{translate:0 -4px;rotate:1deg}}@keyframes jumpPulse{0%,100%{scale:1}50%{scale:1.04}}@keyframes happyWin{from{translate:0 0;scale:1}to{translate:0 -8px;scale:1.05}}
+    #llama{position:absolute;width:124px;height:auto;z-index:24;display:block;opacity:1;visibility:visible;object-fit:contain;filter:drop-shadow(0 12px 10px rgba(0,0,0,.38));animation:llamaMove .22s infinite alternate ease-in-out;pointer-events:none}@keyframes llamaMove{from{translate:0 0}to{translate:0 -5px}}
+    .collectible{position:absolute;width:102px;height:102px;border-radius:50%;display:grid;place-items:center;z-index:15;animation:floatItem 1.7s infinite alternate ease-in-out;filter:drop-shadow(0 10px 12px rgba(0,0,0,.35));cursor:pointer;pointer-events:auto}.collectible::before{content:"";position:absolute;inset:-16px;border-radius:50%;background:radial-gradient(circle,rgba(255,209,76,.58),rgba(255,209,76,.14) 48%,transparent 68%);animation:glowPulse 1.15s infinite alternate ease-in-out}.collectible img{position:relative;width:92px;height:92px;object-fit:contain;border-radius:50%;padding:5px;background:radial-gradient(circle at 35% 35%,#fff9d6,#ffd86d 55%,#f0a821);border:3px solid #fff7c4;box-shadow:0 0 0 5px rgba(116,55,4,.44),0 0 26px rgba(255,211,70,.85)}.objectMiniDesc{position:absolute;left:50%;bottom:112px;transform:translateX(-50%);width:210px;min-height:64px;padding:8px 10px;border-radius:16px;background:linear-gradient(180deg,rgba(255,248,210,.96),rgba(255,219,120,.96));border:3px solid #9b1b30;color:#461c04;text-align:center;box-shadow:0 7px 0 rgba(68,24,4,.35),0 0 22px rgba(255,214,72,.28);font-weight:900;line-height:1.08;pointer-events:none}.objectMiniDesc b{display:block;color:#8d1025;font-size:14px;text-transform:uppercase;letter-spacing:.2px;margin-bottom:3px}.objectMiniDesc small{display:block;font-size:12px;color:#4d2406;font-weight:900;line-height:1.12}.collectible:hover{scale:1.05;filter:drop-shadow(0 10px 12px rgba(0,0,0,.35)) brightness(1.12)}
+    @keyframes floatItem{from{translate:0 0}to{translate:0 -13px}}@keyframes glowPulse{from{opacity:.58;scale:.92}to{opacity:1;scale:1.12}}
+
+
+    /* ===== VIDA EXTRA / META FINAL ===== */
+    #ambientLayer{position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden}
+    .firefly{position:absolute;width:7px;height:7px;border-radius:50%;background:#ffd84a;box-shadow:0 0 12px #ffd84a,0 0 24px rgba(255,216,74,.75);opacity:.75;animation:fireflyMove var(--dur,8s) ease-in-out infinite alternate}
+    @keyframes fireflyMove{from{transform:translate3d(0,0,0) scale(.7);opacity:.25}50%{opacity:1}to{transform:translate3d(var(--dx),var(--dy),0) scale(1.25);opacity:.85}}
+    .trailStar{position:absolute;z-index:28;pointer-events:none;width:12px;height:12px;border-radius:50%;background:#fff1a8;box-shadow:0 0 12px #fff1a8,0 0 24px #ffd447;animation:trailFade .65s ease-out forwards}
+    @keyframes trailFade{to{transform:translate(var(--dx),var(--dy)) scale(.1);opacity:0}}
+    #finalOrb{position:absolute;width:118px;height:118px;border-radius:50%;z-index:18;display:grid;place-items:center;cursor:pointer;pointer-events:auto;filter:drop-shadow(0 18px 18px rgba(0,0,0,.45));animation:orbFloat 1.2s ease-in-out infinite alternate}
+    #finalOrb::before{content:"";position:absolute;inset:-22px;border-radius:50%;background:radial-gradient(circle,rgba(255,217,74,.65),rgba(255,217,74,.16) 55%,transparent 72%);animation:orbPulse 1s ease-in-out infinite alternate}
+    #finalOrb span{position:relative;width:96px;height:96px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 28%,#fff8bd,#ffcf3f 45%,#d46b11 78%);border:5px solid #fff2a8;color:#7a1f08;font-size:42px;box-shadow:0 0 0 6px rgba(116,55,4,.40),0 0 34px rgba(255,211,70,.95)}
+    #finalOrb b{position:absolute;top:112px;left:50%;transform:translateX(-50%);white-space:nowrap;padding:6px 12px;border-radius:999px;background:#9b1b30;color:#fff5c9;border:2px solid #ffe58d;text-shadow:0 2px #000;font-size:13px}
+    #finalOrb.locked{opacity:.45;filter:grayscale(.45) drop-shadow(0 12px 12px rgba(0,0,0,.35))}
+    #finalOrb.locked b::after{content:" bloqueada"}
+    #finalOrb.ready{opacity:1}
+    @keyframes orbFloat{from{translate:0 0}to{translate:0 -14px}}
+    @keyframes orbPulse{from{opacity:.55;scale:.92}to{opacity:1;scale:1.12}}
+    .memoryActions{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 14px}
+    .memoryActions .btn{margin:0;font-size:15px;padding:10px 16px}
+    #memoryStatus{font-weight:1000;color:#fff2be;text-shadow:0 2px #000}
+
+    /* ===== HUD ===== */
+    #hud{position:absolute;left:16px;right:16px;top:16px;z-index:60;display:none;align-items:flex-start;justify-content:space-between;gap:12px;pointer-events:none}.hudOn #hud{display:flex}
+    .hudRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.card{display:flex;align-items:center;gap:8px;min-height:46px;padding:8px 13px;border-radius:18px;background:linear-gradient(180deg,rgba(18,57,100,.94),rgba(8,27,57,.95));border:3px solid rgba(255,217,94,.92);box-shadow:0 8px 0 rgba(33,13,0,.36);color:#fff7cb;font-weight:900;text-shadow:0 2px 2px #000}.avatar{width:48px;height:48px;object-fit:contain;border-radius:50%;background:#d58d34;border:3px solid #ffe58d;box-shadow:0 0 18px rgba(255,211,74,.40)}.badge{padding:8px 15px;border-radius:20px;background:linear-gradient(180deg,#c58728,#793914);border:3px solid rgba(255,238,160,.95);box-shadow:0 8px 0 rgba(47,17,4,.42);text-align:center;line-height:1.05;color:#fff3bd;font-weight:1000;text-shadow:0 3px 2px rgba(0,0,0,.55)}.badge small{display:block;color:#ffe175}.hearts{font-size:24px}.miniMap{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(460px,52vw);height:16px;border-radius:999px;background:rgba(5,20,39,.72);border:2px solid rgba(255,228,120,.90);z-index:55;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.32);display:none}.hudOn .miniMap{display:block}#progress{height:100%;width:0%;background:linear-gradient(90deg,#ffcf40,#ff7b24,#ffdf6b);border-radius:999px;box-shadow:0 0 18px #ffcf40}
+    #message{position:absolute;left:50%;bottom:122px;transform:translateX(-50%);max-width:min(780px,92vw);display:none;z-index:75;padding:13px 18px;border-radius:20px;background:rgba(255,248,215,.96);border:4px solid var(--red);color:#4a2104;font-weight:1000;text-align:center;box-shadow:0 10px 0 rgba(54,20,2,.38)}
+
+    /* ===== PANELS ===== */
+    .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:22px;background:radial-gradient(circle at center,rgba(255,218,109,.24),rgba(12,29,42,.72) 42%,rgba(5,12,24,.92));backdrop-filter:blur(4px);z-index:100}.overlay.active{display:flex}
+    .menuPanel{position:relative;width:min(1080px,96vw);min-height:min(630px,90vh);border-radius:34px;overflow:hidden;background-image:linear-gradient(90deg,rgba(0,0,0,.76),rgba(0,0,0,.18)),url("assets/portada_3d.png");background-size:cover;background-position:center;border:5px solid rgba(255,228,129,.95);box-shadow:0 22px 0 rgba(41,16,2,.55),0 0 80px rgba(255,195,55,.24);padding:32px;display:flex;align-items:flex-end}
+    .menuText{max-width:590px;padding:24px;border-radius:28px;background:rgba(39,14,3,.76);border:3px solid rgba(255,220,106,.75);box-shadow:0 0 26px rgba(255,205,65,.22)}.logo{font-size:clamp(38px,6vw,74px);line-height:.90;font-weight:1000;color:#ffc63d;text-transform:uppercase;text-shadow:0 5px 0 #7d2a0b,0 10px 24px #000,0 0 24px rgba(255,213,71,.70);letter-spacing:-2px}.logo span{display:block;color:#fff5c9;font-size:.45em;letter-spacing:1px;margin-top:9px;text-shadow:0 4px 0 #17345a,0 8px 18px #000}.menuText p{font-size:18px;line-height:1.35;margin:16px 0;color:#fff3c3;font-weight:800;text-shadow:0 2px 2px #000}.btn{border:0;cursor:pointer;padding:13px 20px;margin:7px 7px 0 0;border-radius:18px;color:#fff7cb;font-weight:1000;font-size:17px;text-transform:uppercase;letter-spacing:.4px;background:linear-gradient(180deg,#ffcd45,#e17615 55%,#a42a11);border:3px solid #fff1a8;box-shadow:0 8px 0 #5b1907,0 0 22px rgba(255,200,42,.35);text-shadow:0 2px 2px rgba(0,0,0,.65);transition:.15s transform,.15s filter,.15s box-shadow}.btn:hover{transform:translateY(-3px);filter:saturate(1.2);box-shadow:0 11px 0 #5b1907,0 0 30px rgba(255,220,84,.55)}.btn:active{transform:translateY(5px);box-shadow:0 3px 0 #5b1907}.btn.secondary{background:linear-gradient(180deg,#37b7ff,#1362b0 56%,#103c71);box-shadow:0 8px 0 #082241}.btn.green{background:linear-gradient(180deg,#67d66d,#25943f 56%,#146527);box-shadow:0 8px 0 #083a18}.note{font-size:13px;opacity:.90;margin-top:10px;color:#fff0af}
+    .gameCards{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:14px;margin-top:18px}.gameCard{background:linear-gradient(180deg,rgba(255,240,169,.20),rgba(54,20,3,.88));border:3px solid rgba(255,226,119,.82);border-radius:22px;overflow:hidden;box-shadow:0 10px 0 rgba(36,13,2,.48);cursor:pointer;transition:.15s transform}.gameCard:hover{transform:translateY(-4px)}.gameCard img{width:100%;height:112px;object-fit:cover;object-position:center;display:block;background:#0b223b}.gameCard h3{font-size:17px;padding:10px 12px 3px;color:#ffe175;text-shadow:0 2px #000}.gameCard p{font-size:13px;margin:0;padding:0 12px 12px;line-height:1.25;color:#fff4c2}
+
+    /* ===== QUIZ MODAL ===== */
+    .quizCard,.finishCard,.modalCard{width:min(780px,94vw);border-radius:30px;padding:24px 26px 28px;text-align:center;box-shadow:0 18px 0 rgba(45,17,2,.50),0 0 60px rgba(255,224,96,.35)}.quizCard{max-height:88vh;overflow-y:auto;scrollbar-width:thin}.quizCard{background:linear-gradient(180deg,rgba(255,249,219,.98),rgba(255,223,144,.98));color:#4a2104;border:5px solid var(--red)}.quizIcon{width:96px;height:96px;object-fit:contain;margin:0 auto 12px;display:block;border-radius:50%;padding:8px;background:#ffdf6e;border:4px solid #fff7c4;box-shadow:0 0 30px rgba(255,202,57,.75)}.quizCard h2{font-size:30px;color:#8d1025;text-transform:uppercase;text-shadow:0 2px #ffdc64;margin-bottom:10px}.quizCard p{font-size:22px;font-weight:1000;line-height:1.25;margin-bottom:14px}.placeDesc{margin:10px auto 14px;padding:11px 14px;border-radius:18px;background:linear-gradient(180deg,#fff7cc,#ffe28a);border:3px solid #c87a16;color:#5a2705;font-size:15px;font-weight:900;line-height:1.28;text-align:left;box-shadow:0 5px 0 rgba(93,39,4,.22)}.placeDesc b{color:#8d1025}.placeDesc .tag{display:inline-block;margin-bottom:5px;padding:4px 9px;border-radius:999px;background:#9b1b30;color:#fff5cc;font-size:13px}.options{display:grid;gap:11px;margin-top:13px;padding-bottom:4px}.optionBtn{border:3px solid #8b2f14;border-radius:18px;padding:13px 14px;background:linear-gradient(180deg,#fff4b8,#ffd66b);color:#532604;font-size:18px;font-weight:1000;cursor:pointer;box-shadow:0 6px 0 rgba(86,34,4,.35)}.optionBtn:hover{transform:translateY(-2px);filter:brightness(1.05)}.finishCard{background:linear-gradient(180deg,rgba(39,14,3,.92),rgba(95,33,10,.92));border:5px solid #ffe58d}.finishCard img{height:190px;filter:drop-shadow(0 15px 13px rgba(0,0,0,.45));animation:happyWin .75s ease-in-out infinite alternate}.finishCard h2{font-size:44px;color:#ffd447;text-shadow:0 5px #6b101f,0 10px 18px #000;margin:8px 0}.finishCard p{font-size:20px;font-weight:900;color:#fff3c3;line-height:1.35;margin:10px 0 15px}
+
+    /* ===== MINIGAMES ===== */
+    /* Cartas de memoria corregidas: imagen centrada y nombre ordenado */
+    .miniScreen{position:absolute;inset:0;display:none;z-index:20;overflow:hidden;background:linear-gradient(180deg,#0c5d96,#0b223b)}.miniScreen.active{display:block}.miniBg{position:absolute;inset:0;background:center bottom/cover no-repeat;filter:saturate(1.07) brightness(.83)}.miniShade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.50))}.miniHeader{position:absolute;left:20px;right:20px;top:18px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px}.miniTitle{padding:10px 16px;border-radius:18px;background:linear-gradient(180deg,rgba(91,40,9,.95),rgba(37,15,4,.95));border:3px solid var(--stroke);box-shadow:0 8px 0 rgba(33,13,0,.36);font-weight:1000;color:#fff2be;text-shadow:0 2px #000}.miniBoard{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:min(960px,94vw);min-height:520px;padding:22px;border:5px solid rgba(255,228,129,.90);border-radius:32px;background:rgba(20,13,8,.64);box-shadow:0 18px 0 rgba(0,0,0,.35),0 0 60px rgba(255,217,79,.18);backdrop-filter:blur(5px)}.miniHelp{text-align:center;font-weight:900;color:#fff4c1;text-shadow:0 2px #000;margin-bottom:14px}
+    .memoryGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;align-items:center}.memoryCard{position:relative;height:142px;border:3px solid #ffe082;border-radius:20px;cursor:pointer;transform-style:preserve-3d;transition:.35s transform;box-shadow:0 8px 0 rgba(41,16,3,.5);overflow:hidden}.memoryCard.flipped,.memoryCard.matched{transform:rotateY(180deg)}.memoryFace{position:absolute;inset:0;border-radius:16px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;text-align:center}.memoryBack{background:linear-gradient(180deg,#96301f,#4b140a);font-size:46px;text-shadow:0 3px #000}.memoryFront{background:linear-gradient(180deg,#fff5c7,#ffcf58);transform:rotateY(180deg);color:#3e1b05;font-weight:1000}.memoryFront>div{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:8px 6px}.memoryFront img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto;flex:0 0 auto}.memoryFront span{display:block;width:100%;max-width:100%;font-size:12px;line-height:1.08;text-align:center;padding:0 4px;white-space:normal;overflow-wrap:break-word;word-break:normal;text-wrap:balance}.memoryCard.matched{filter:brightness(1.15);opacity:.92}
+    /* Segundo minijuego de cartas: usa assets/cartas */
+    .cultureGrid{display:grid;grid-template-columns:repeat(6,minmax(96px,1fr));gap:12px;align-items:center;justify-content:center}
+    .cultureCard{position:relative;height:132px;border:3px solid #ffe082;border-radius:20px;cursor:pointer;transform-style:preserve-3d;transition:.38s transform,.2s filter,.2s opacity;box-shadow:0 8px 0 rgba(41,16,3,.5);overflow:hidden;background:#5b180d;padding:0}
+    .cultureCard.flipped,.cultureCard.matched{transform:rotateY(180deg)}
+    .cultureCard.preview{box-shadow:0 0 0 4px rgba(255,238,150,.45),0 0 30px rgba(255,212,68,.55),0 8px 0 rgba(41,16,3,.5)}
+    .cultureFace{position:absolute;inset:0;border-radius:16px;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;text-align:center;overflow:hidden}
+    .cultureBack{background:linear-gradient(180deg,#7b1d12,#3a0b07)}
+    .cultureBack img{width:100%;height:100%;object-fit:cover;display:block}
+    .cultureFront{transform:rotateY(180deg);background:linear-gradient(180deg,#fff6d2,#f2bd44);color:#3e1b05;font-weight:1000}
+    .cultureFront>div{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:7px}
+    .cultureFront img{width:88px;height:88px;object-fit:contain;display:block;filter:drop-shadow(0 5px 5px rgba(0,0,0,.25))}
+    .cultureFront span{display:block;width:100%;font-size:11px;line-height:1.05;text-align:center;color:#572406;font-weight:1000}
+    .cultureCard.matched{filter:brightness(1.16);opacity:.92;cursor:default}
+    .cultureCard.disabled{pointer-events:none}
+
+    /* Corrección visual del minijuego 2: las imágenes se muestran sin depender del giro 3D */
+    .cultureCard,.cultureCard.flipped,.cultureCard.matched{transform:none!important}
+    .cultureFace{backface-visibility:visible!important;transition:opacity .32s ease,transform .32s ease}
+    .cultureBack{opacity:1;transform:scale(1)}
+    .cultureFront{opacity:0;transform:scale(.92)!important}
+    .cultureCard.flipped .cultureBack,.cultureCard.matched .cultureBack{opacity:0;transform:scale(1.05)}
+    .cultureCard.flipped .cultureFront,.cultureCard.matched .cultureFront{opacity:1;transform:scale(1)!important}
+    .cultureBack{font-size:48px;color:#ffe48a;text-shadow:0 3px #561409}
+    .missingCardImage{display:grid;place-items:center;width:100%;height:100%;font-size:40px;background:linear-gradient(180deg,#fff4c7,#e6ad32);color:#6a2108}
+    .missingCardImage small{display:block;font-size:10px;padding:4px;color:#5a2409}
+
+    /* Minijuego 3: emparejar conceptos y significados con lazos */
+    .associationPanel{max-width:920px;margin:6px auto 0;padding:18px;border-radius:28px;background:linear-gradient(180deg,rgba(255,249,218,.97),rgba(255,214,112,.97));border:5px solid #9b1b30;color:#431d05;box-shadow:0 14px 0 rgba(45,17,2,.46),0 0 45px rgba(255,216,72,.30);overflow-x:auto;scrollbar-width:thin}
+    .associationStage{position:relative;min-width:780px;min-height:405px;padding:8px 10px 12px;isolation:isolate}
+    .associationCaption{text-align:center;font-size:15px;font-weight:1000;text-transform:uppercase;letter-spacing:.6px;color:#7b1729;margin:2px 0 10px}
+    .associationCaption.bottom{margin-top:142px}
+    .associationRow{position:relative;z-index:3;display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:12px;align-items:stretch}
+    .associationNode{position:relative;min-height:82px;padding:11px 8px;border-radius:18px;border:4px solid #8b2f14;background:linear-gradient(180deg,#fff8d2,#f3c14e);color:#532604;font-size:15px;line-height:1.15;font-weight:1000;cursor:pointer;box-shadow:0 7px 0 rgba(86,34,4,.38);transition:.16s transform,.16s filter,.16s background,.16s border-color;z-index:4}
+    .associationNode:hover{transform:translateY(-3px);filter:brightness(1.06)}
+    .associationNode.selected{background:linear-gradient(180deg,#dff4ff,#55afea);border-color:#0c5c9f;box-shadow:0 7px 0 #08355c,0 0 22px rgba(47,163,235,.6)}
+    .associationNode.matched{background:linear-gradient(180deg,#c9ffc8,#4dc86a);border-color:#176a2e;color:#073a12;cursor:default;box-shadow:0 7px 0 #0d4b20,0 0 20px rgba(65,203,103,.45)}
+    .associationNode.matched::after{content:"✓";position:absolute;right:6px;top:5px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#176a2e;color:white;font-size:14px}
+    .associationNode.wrong{background:linear-gradient(180deg,#ffd0d0,#e65555);border-color:#891111;animation:shake .25s ease-in-out 2}
+    .associationNode:disabled{cursor:default}
+    .associationLines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible}
+    .associationLine{fill:none;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 3px 2px rgba(0,0,0,.28));stroke-dasharray:900;stroke-dashoffset:900;animation:drawAssociationLine .55s ease-out forwards}
+    @keyframes drawAssociationLine{to{stroke-dashoffset:0}}
+    .associationLinkHint{position:absolute;left:50%;top:190px;transform:translate(-50%,-50%);z-index:1;padding:7px 14px;border-radius:999px;background:#9b1b30;color:#fff5cc;border:2px solid #ffe58d;font-size:14px;font-weight:1000;white-space:nowrap}
+    .associationFeedback{min-height:31px;margin:13px 0 0;text-align:center;font-size:18px;font-weight:1000;color:#72172a}
+    @media(max-width:900px){.associationPanel{padding:12px}.associationStage{min-width:720px}.associationNode{font-size:13px;min-height:76px;padding:9px 6px}.associationCaption.bottom{margin-top:132px}.associationLinkHint{top:178px;font-size:12px}}
+    .quipuRack{height:80px;border-radius:24px;background:linear-gradient(180deg,#6a3a18,#321205);border:3px solid #ffe082;margin:12px 0 28px;position:relative;box-shadow:0 10px 0 rgba(0,0,0,.35)}.quipuRack::before{content:"";position:absolute;left:22px;right:22px;top:35px;height:12px;border-radius:999px;background:linear-gradient(180deg,#c89140,#60320d);box-shadow:0 2px 0 #2b1306}.numberGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:14px}.numberToken{position:relative;height:160px;cursor:pointer}.numberToken::before{content:"";position:absolute;left:50%;top:0;width:8px;height:95px;transform:translateX(-50%);border-radius:99px;background:var(--rope,#d98731);box-shadow:0 0 0 2px rgba(80,35,10,.5)}.numberToken button{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:86px;height:86px;border-radius:24px;border:4px solid #ffe7a5;background:linear-gradient(180deg,var(--token,#ffb339),#9b3a14);box-shadow:0 8px 0 rgba(44,13,2,.48),0 0 20px rgba(255,211,67,.28);font-size:34px;font-weight:1000;color:#fff9ce;text-shadow:0 3px #4b1605;cursor:pointer}.numberToken button.correct{filter:brightness(1.25);scale:1.05}.numberToken button.wrong{animation:shake .25s ease-in-out 2}@keyframes shake{0%,100%{translate:0 0}33%{translate:-6px 0}66%{translate:6px 0}}.answerTrail{min-height:54px;text-align:center;margin-top:16px}.trailPill{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;margin:4px;border-radius:50%;background:#ffcf40;color:#4b1605;border:3px solid #fff4bd;font-weight:1000;box-shadow:0 5px 0 rgba(68,24,4,.45)}
+
+
+    .mathPanel{max-width:720px;margin:20px auto 0;padding:24px;border-radius:30px;background:linear-gradient(180deg,rgba(255,247,205,.96),rgba(255,212,104,.96));border:5px solid #9b1b30;color:#431d05;text-align:center;box-shadow:0 14px 0 rgba(45,17,2,.46),0 0 45px rgba(255,216,72,.30)}
+    .mathBadge{display:inline-block;margin-bottom:12px;padding:8px 14px;border-radius:999px;background:#9b1b30;color:#fff5cc;border:2px solid #ffe58d;font-weight:1000;text-transform:uppercase;font-size:14px}
+    .mathQuestion{font-size:clamp(54px,9vw,96px);font-weight:1000;line-height:1;margin:12px 0 18px;color:#6b101f;text-shadow:0 4px #ffd166,0 8px 18px rgba(0,0,0,.25)}
+    .mathOptions{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
+    .mathOption{border:4px solid #8b2f14;border-radius:22px;padding:16px;background:linear-gradient(180deg,#fff4b8,#ffd66b);color:#532604;font-size:32px;font-weight:1000;cursor:pointer;box-shadow:0 8px 0 rgba(86,34,4,.38);transition:.14s transform,.14s filter}
+    .mathOption:hover{transform:translateY(-3px);filter:brightness(1.06)}
+    .mathOption.correct{background:linear-gradient(180deg,#b9ffba,#35b354);color:#073a12}
+    .mathOption.wrong{background:linear-gradient(180deg,#ffd0d0,#e44c4c);color:#5b0606;animation:shake .25s ease-in-out 2}
+    .mathStats{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;margin-top:18px;font-weight:1000;font-size:18px}
+
+    /* ===== FX / CONTROLS ===== */
+    .dust,.spark{position:absolute;z-index:30;pointer-events:none;border-radius:50%}.dust{width:14px;height:14px;background:rgba(220,168,83,.78);animation:dustFly .48s ease-out forwards;filter:blur(.3px)}.spark{width:10px;height:10px;background:#ffd447;box-shadow:0 0 12px #ffd447,0 0 22px #fff7a8;animation:sparkFly .75s ease-out forwards}@keyframes dustFly{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}@keyframes sparkFly{to{transform:translate(var(--dx),var(--dy)) scale(.1);opacity:0}}
+    #controls{position:absolute;left:18px;right:18px;bottom:18px;z-index:85;display:none;justify-content:space-between;pointer-events:none}.pad{display:flex;gap:12px;pointer-events:auto}.ctrl{width:68px;height:68px;border-radius:50%;border:4px solid rgba(255,238,167,.95);background:rgba(139,24,45,.82);color:#fff;font-size:30px;font-weight:1000;box-shadow:0 8px 0 rgba(54,16,3,.44);text-shadow:0 2px #000;touch-action:none}
+    .topBack{pointer-events:auto}.hidden{display:none!important}
+    @media(max-width:900px){.gameCards{grid-template-columns:1fr}.menuPanel{align-items:flex-end;min-height:92vh;padding:16px}.menuText{padding:18px}.menuText p{font-size:15px}.btn{font-size:14px;padding:10px 14px}.badge{display:none}.miniMap{width:45vw;bottom:94px}.platformLabel{font-size:12px}.landmark{transform:scale(.82);transform-origin:left top}#controls{display:flex}.collectible{scale:.78}.objectMiniDesc{width:170px;min-height:58px;bottom:108px;padding:7px 8px}.objectMiniDesc b{font-size:12px}.objectMiniDesc small{font-size:10.5px}#hero{width:auto;height:170px}.quizCard{max-height:86vh;padding:18px 16px 22px}.quizIcon{width:82px;height:82px;margin:0 auto 8px}.quizCard p{font-size:16px}.quizCard h2{font-size:22px}.placeDesc{font-size:14px;padding:10px}.optionBtn{font-size:16px}.memoryGrid{grid-template-columns:repeat(3,1fr)}.memoryCard{height:128px}.memoryFront img{width:66px;height:66px}.memoryFront span{font-size:11px;line-height:1.05}.cultureGrid{grid-template-columns:repeat(3,minmax(82px,1fr));gap:9px}.cultureCard{height:118px}.cultureFront img{width:70px;height:70px}.cultureFront span{font-size:10px}.clueOptions{grid-template-columns:1fr}.clueOption{min-height:130px;display:grid;grid-template-columns:105px 1fr;align-items:center;gap:8px}.clueOption img{height:100px;margin:0}.numberGrid{grid-template-columns:repeat(4,1fr)}.numberToken{height:138px}.numberToken button{width:72px;height:72px}.mathOptions{grid-template-columns:1fr}.mathOption{font-size:26px;padding:13px}.mathQuestion{font-size:54px}.miniBoard{top:55%;min-height:auto;max-height:74vh;overflow:auto}.quizCard{max-height:82vh}.miniHeader{top:12px;left:10px;right:10px}.miniTitle{font-size:14px}.finishCard h2{font-size:32px}.finishCard p{font-size:17px}}
+
+    /* ===== SUPER FINAL: PERSONAJE, SONIDO, CONFETI Y UI ===== */
+    .superTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    .miniPill{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:rgba(10,33,60,.82);border:2px solid rgba(255,229,125,.85);color:#fff5cc;font-size:13px;font-weight:1000;text-shadow:0 2px #000}
+    #heroChoice{margin-top:9px;color:#fff2be;font-size:13px;font-weight:1000;text-shadow:0 2px #000}
+    .confettiPiece{position:absolute;z-index:200;top:-20px;width:12px;height:18px;border-radius:4px;background:var(--c,#ffd447);pointer-events:none;animation:confettiFall var(--dur,2.2s) ease-in forwards}
+    @keyframes confettiFall{to{transform:translate3d(var(--x),105vh,0) rotate(720deg);opacity:.2}}
+    .screenFlash{position:absolute;inset:0;z-index:180;pointer-events:none;background:radial-gradient(circle,rgba(255,244,170,.7),transparent 55%);animation:flashOut .55s ease-out forwards}
+    @keyframes flashOut{to{opacity:0}}
+    #finalOrb.ready span{animation:orbReady .6s ease-in-out infinite alternate}
+    @keyframes orbReady{from{scale:1;filter:saturate(1)}to{scale:1.1;filter:saturate(1.4) brightness(1.15)}}
+    .memoryCard.preview{box-shadow:0 0 0 4px rgba(255,238,150,.45),0 0 30px rgba(255,212,68,.55),0 8px 0 rgba(41,16,3,.5)}
+    .memoryActions .btn[disabled]{opacity:.65;filter:grayscale(.2);cursor:not-allowed}
+
+  </style>
+</head>
+<body>
+<main id="game">
+  <section class="scene" id="adventureScene">
+    <div id="bg"></div><div class="sunGlow"></div><div class="mist"></div><div id="ambientLayer"></div>
+    <div id="world">
+      <img id="hero" src="assets/hero_idle.png" alt="Personaje inka 3D" draggable="false" />
+      <img id="llama" src="assets/llama.png" alt="Llama compañera sin fondo" draggable="false" />
+      <div id="platformsLayer"></div><div id="itemsLayer"></div><div id="finalOrb" class="locked" title="Meta final"><span>🏆</span><b>Bolita final</b></div><div id="fxLayer"></div><div class="pathStripe"></div><div class="ground"></div>
+    </div>
+  </section>
+
+  <section id="quipuGame" class="miniScreen">
+    <div class="miniBg" style="background-image:url('assets/mini_memoria_bg.png')"></div><div class="miniShade"></div>
+    <div class="miniHeader">
+      <button class="btn secondary topBack" data-menu>🏠 Menú</button>
+      <div class="miniTitle">🃏 Juego 2: Cartas de la Cultura Inka</div>
+      <div class="card">Parejas: <span id="culturePairs">0</span>/9</div>
+    </div>
+    <div class="miniBoard">
+      <p id="cultureHelp" class="miniHelp">Observa las 18 cartas frontales. Después de 3 segundos todas mostrarán el reverso.</p>
+      <div class="memoryActions"><span id="cultureStatus">👀 Memoriza las imágenes...</span></div>
+      <div id="cultureGrid" class="cultureGrid"></div>
+    </div>
+  </section>
+
+  <section id="clueGame" class="miniScreen">
+    <div class="miniBg" style="background-image:url('assets/mini_quipu_bg.png')"></div><div class="miniShade"></div>
+    <div class="miniHeader">
+      <button class="btn secondary topBack" data-menu>🏠 Menú</button>
+      <div class="miniTitle">🪢 Juego 3: Une con lazos</div>
+      <div class="card">Parejas: <span id="associationPairs">0</span>/5</div>
+    </div>
+    <div class="miniBoard">
+      <p id="associationHelp" class="miniHelp">Selecciona una palabra de la fila superior y después su significado en la fila inferior. Cada acierto quedará unido con un lazo.</p>
+      <div class="associationPanel" id="associationPanel">
+        <div class="associationStage" id="associationStage">
+          <svg id="associationLines" class="associationLines" aria-hidden="true"></svg>
+          <div class="associationCaption">1. Conceptos de la cultura inka</div>
+          <div id="associationConcepts" class="associationRow"></div>
+          <div class="associationLinkHint">🪢 Une cada palabra con su significado</div>
+          <div class="associationCaption bottom">2. Significados desordenados</div>
+          <div id="associationMeanings" class="associationRow"></div>
+        </div>
+      </div>
+      <p id="associationFeedback" class="associationFeedback">Todo está desordenado. Selecciona una palabra arriba y su significado abajo.</p>
+    </div>
+  </section>
+
+  <header id="hud">
+    <div class="hudRow"><img class="avatar" src="assets/hero_idle.png" alt="avatar" /><div class="card"><span id="hearts" class="hearts">❤️❤️❤️</span></div><div class="card">⭐ <span id="score">0</span></div><div class="card">🎒 <span id="count">0</span>/9</div></div>
+    <div class="badge">Aventura Inka<small>Aprende jugando en Cusco</small></div>
+    <div class="hudRow"><button class="btn secondary topBack" data-menu>🏠 Menú</button></div>
+  </header>
+  <div class="miniMap"><div id="progress"></div></div><div id="message"></div>
+
+  <section id="menu" class="overlay active">
+    <div class="menuPanel"><div class="menuText">
+      <h1 class="logo">Aventura Inka<span>en Cusco 3D</span></h1>
+      <p>Elige uno de los 3 juegos: salto y aventura, cartas de memoria, o unión de conceptos con lazos.</p>
+      <div class="gameCards">
+        <div class="gameCard" data-start="adventure"><img src="assets/fondo_cusco_3d.png" alt="Juego de salto"><h3>1. Salto Inka</h3><p>Corre, salta, recoge los 9 objetos y responde preguntas sobre Cusco.</p></div>
+        <div class="gameCard" data-start="quipu"><img data-card-file="inti" src="assets/cartas/inti.png" alt="Juego de cartas"><h3>2. Cartas culturales</h3><p>Observa las 18 cartas durante 3 segundos y encuentra las 9 parejas.</p></div>
+        <div class="gameCard" data-start="clue"><img data-card-file="quipu" src="assets/cartas/quipu.png" alt="Juego de lazos"><h3>3. Une con lazos</h3><p>Relaciona 5 conceptos con 5 significados desordenados.</p></div>
+      </div>
+      <button class="btn" data-start="adventure">🏃 Jugar salto</button><button class="btn secondary" data-start="quipu">🃏 Jugar cartas</button><button class="btn green" data-start="clue">🪢 Jugar lazos</button>
+      <div class="superTools">
+        <button class="btn green" id="soundBtn">🔊 Sonido</button>
+        
+      </div>
+      <div id="heroChoice">Personaje actual: Explorador Inka</div>
+      <div class="note">Controles aventura: ← → para caminar y espacio / ↑ para saltar.</div>
+    </div></div>
+  </section>
+
+  <section id="quiz" class="overlay">
+    <article class="quizCard"><img id="quizImg" class="quizIcon" src="assets/inti.png" alt="objeto" /><h2 id="quizTitle">Pregunta</h2><div id="placeDesc" class="placeDesc"></div><p id="quizQuestion"></p><div id="options" class="options"></div></article>
+  </section>
+
+  <section id="finish" class="overlay">
+    <article class="finishCard"><img id="finishHero" src="assets/hero_win.png" alt="ganador" /><h2 id="finishTitle">¡Misión cumplida!</h2><p id="finishText"></p><button class="btn" id="againBtn">Jugar otra vez</button><button class="btn secondary" data-menu>Volver al menú</button></article>
+  </section>
+
+  <section id="controls" aria-label="Controles táctiles"><div class="pad"><button class="ctrl" id="leftBtn">◀</button><button class="ctrl" id="rightBtn">▶</button></div><div class="pad"><button class="ctrl" id="jumpBtn">⬆</button></div></section>
+</main>
+<script>
+const WORLD_W=5000;let viewW=innerWidth,viewH=innerHeight,floorY=viewH-122,cameraX=0;let started=false,paused=true,mode="menu",score=0,lives=3,lastTime=0,dustTimer=0,heroTrailTimer=0,jumpQueued=false,currentQuizItem=null;
+const keys={left:false,right:false};
+const $=id=>document.getElementById(id);const game=$("game"),bg=$("bg"),world=$("world"),heroEl=$("hero"),llamaEl=$("llama"),itemsLayer=$("itemsLayer"),platformsLayer=$("platformsLayer"),finalOrb=$("finalOrb"),ambientLayer=$("ambientLayer"),fxLayer=$("fxLayer");
+const scoreEl=$("score"),countEl=$("count"),heartsEl=$("hearts"),progressEl=$("progress"),menu=$("menu"),quizScreen=$("quiz"),finishScreen=$("finish"),messageEl=$("message"),quizImg=$("quizImg"),quizTitle=$("quizTitle"),placeDesc=$("placeDesc"),quizQuestion=$("quizQuestion"),optionsEl=$("options"),finishTitle=$("finishTitle"),finishText=$("finishText"),quipuGame=$("quipuGame"),clueGame=$("clueGame");
+const hero={x:90,y:0,w:90,h:150,vx:0,vy:0,speed:10.2,jump:-15.8,grounded:false,facing:1};
+const heroSkins={
+  inka:{
+    name:"Explorador Inka",
+    idle:"assets/hero_idle.png",
+    run:"assets/hero_run.png",
+    jump:"assets/hero_jump.png",
+    point:"assets/hero_point.png",
+    win:"assets/hero_win.png",
+    visualHeight:172,
+    groundOffset:2
+  }
+};
+localStorage.removeItem("cuscoHero");
+const currentHero="inka";
+let soundEnabled=localStorage.getItem("cuscoSound")==="off"?false:true;
+
+// Imágenes transparentes exactas de la llama acompañante.
+// Se carga primero llama.png y, si falla, llama_full.png.
+const llamaCompanionSources=[
+  "assets/llama.png",
+  "assets/llama_full.png"
+];
+function loadLlamaCompanion(){
+  if(!llamaEl)return;
+  let index=0;
+  const tryNext=()=>{
+    if(index>=llamaCompanionSources.length){
+      llamaEl.style.display="none";
+      console.warn("No se encontró llama.png ni llama_full.png dentro de assets.");
+      return;
+    }
+    llamaEl.style.display="block";
+    llamaEl.onerror=()=>{index++;tryNext();};
+    llamaEl.onload=()=>{llamaEl.onerror=null;llamaEl.style.display="block";};
+    llamaEl.src=llamaCompanionSources[index];
+  };
+  tryNext();
+}
+
+const platformData=[{x:420,yOff:230,w:220},{x:850,yOff:230,w:220},{x:1280,yOff:230,w:220},{x:1710,yOff:230,w:240},{x:2160,yOff:230,w:220},{x:2600,yOff:230,w:220},{x:3040,yOff:230,w:220},{x:3480,yOff:230,w:250},{x:3960,yOff:230,w:250},{x:4440,yOff:230,w:280}];let platforms=[];
+const items=[
+{id:"plaza",name:"Plaza de Armas",mini:"Centro histórico del Cusco.",icon:"assets/plaza.png",x:480,yOff:340,collected:false,desc:"La Plaza de Armas es el centro histórico de la ciudad del Cusco. Allí se observan iglesias, casonas antiguas y celebraciones importantes. Es un lugar de encuentro para familias, turistas y estudiantes.",q:"¿Qué se realiza muchas veces en la Plaza de Armas del Cusco?",options:["Carreras de autos","Fiestas, desfiles y reuniones","Pesca en el mar"],answer:1,info:"En la Plaza de Armas se realizan fiestas, desfiles y reuniones importantes."},
+{id:"quipu",name:"Quipu",mini:"Cuerdas con nudos para registrar datos.",icon:"assets/quipu.png",x:910,yOff:340,collected:false,desc:"El quipu era un sistema de cuerdas y nudos usado por los inkas para guardar información. Les ayudaba a registrar cantidades, alimentos, personas y datos importantes.",q:"¿Qué parte del quipu ayudaba a registrar información?",options:["Los nudos","Las ruedas","Las ventanas"],answer:0,info:"Los nudos del quipu ayudaban a registrar información."},
+{id:"inti",name:"Inti",mini:"El Sol en la cultura inka.",icon:"assets/inti.png",x:1340,yOff:340,collected:false,desc:"Inti significa Sol. Para los inkas, el Sol era muy importante porque daba luz, calor y ayudaba al crecimiento de los alimentos en los campos.",q:"¿Por qué el Sol era importante para los inkas?",options:["Porque apagaba el fuego","Porque daba luz, calor y ayudaba a los cultivos","Porque era una montaña"],answer:1,info:"El Sol daba luz, calor y ayudaba a crecer los cultivos."},
+{id:"qori",name:"Qorikancha",mini:"Templo inka dedicado al Sol.",icon:"assets/qorikancha.png",x:1780,yOff:340,collected:false,desc:"El Qorikancha fue uno de los templos más importantes del Imperio Inka. Estaba ubicado en Cusco y fue dedicado principalmente al Sol.",q:"¿Dónde se ubicaba el Qorikancha?",options:["En Cusco","En una isla del océano","En la selva de Brasil"],answer:0,info:"El Qorikancha se ubicaba en la ciudad del Cusco."},
+{id:"chakana",name:"Chakana",mini:"Cruz andina tradicional.",icon:"assets/chakana.png",x:2220,yOff:340,collected:false,desc:"La chakana es conocida como la cruz andina. Representa la unión entre la naturaleza, las personas y el mundo espiritual en la cultura andina.",q:"¿Qué representa la chakana?",options:["Solo un juguete","La unión entre naturaleza, personas y mundo espiritual","Un instrumento musical moderno"],answer:1,info:"La chakana representa la unión entre la naturaleza, las personas y el mundo espiritual."},
+{id:"maiz",name:"Maíz",mini:"Alimento andino importante.",icon:"assets/maiz.png",x:2660,yOff:340,collected:false,desc:"El maíz fue un alimento muy importante para los pueblos andinos. En Cusco existen diferentes variedades y se usa en comidas y bebidas tradicionales.",q:"¿Para qué se usa el maíz en Cusco?",options:["Solo para decorar paredes","En comidas y bebidas tradicionales","Para construir casas"],answer:1,info:"El maíz se usa en comidas y bebidas tradicionales."},
+{id:"llama",name:"Llama",mini:"Animal andino de carga y lana.",icon:"assets/llama_icon.png",x:3100,yOff:340,collected:false,desc:"La llama es un animal andino. Antiguamente ayudaba a transportar carga y también daba lana para elaborar tejidos.",q:"Además de transportar carga, ¿qué podía dar la llama?",options:["Lana para tejidos","Gasolina","Vidrio"],answer:0,info:"La llama daba lana para elaborar tejidos."},
+{id:"sacsay",name:"Sacsayhuamán",mini:"Construcción de grandes piedras.",icon:"assets/sacsayhuaman.png",x:3550,yOff:340,collected:false,desc:"Sacsayhuamán es una construcción inka ubicada cerca de la ciudad del Cusco. Es famosa por sus enormes muros de piedra y por su gran valor histórico.",q:"¿Qué caracteriza a Sacsayhuamán?",options:["Sus enormes muros de piedra","Sus edificios de vidrio","Sus barcos antiguos"],answer:0,info:"Sacsayhuamán es famoso por sus enormes muros de piedra."},
+{id:"machu",name:"Machu Picchu",mini:"Ciudadela inka entre montañas.",icon:"assets/machu.png",x:4030,yOff:340,collected:false,desc:"Machu Picchu es una ciudadela inka construida entre montañas. Es uno de los lugares más conocidos del Perú y pertenece a la región Cusco.",q:"¿Cómo es el lugar donde está construido Machu Picchu?",options:["Entre montañas","Debajo del mar","En medio de un desierto sin cerros"],answer:0,info:"Machu Picchu está construido entre montañas."}
+]
+function setMode(next){
+  mode=next;
+  menu.classList.toggle("active",next==="menu");
+  quipuGame.classList.toggle("active",next==="quipu");
+  clueGame.classList.toggle("active",next==="clue");
+  game.classList.toggle("hudOn",next==="adventure");
+  quizScreen.classList.remove("active");
+  finishScreen.classList.remove("active");
+  started=next==="adventure";
+  paused=next!=="adventure";
+  if(next==="quipu")startQuipu();
+  if(next==="clue")startClueGame();
+  if(next==="menu"){started=false;paused=true;}
+}
+function resize(){viewW=innerWidth;viewH=innerHeight;floorY=viewH-122;if(!hero.grounded)hero.y=Math.min(hero.y,floorY-hero.h);buildPlatforms();positionWorld();updateVisuals();if(mode==="clue")requestAnimationFrame(drawAssociationLines);}
+function buildPlatforms(){platformsLayer.innerHTML="";platforms=platformData.map(p=>({...p,y:floorY-p.yOff,h:40}));platforms.forEach(p=>{const el=document.createElement("div");el.className="platform";el.style.left=p.x+"px";el.style.top=p.y+"px";el.style.width=p.w+"px";el.innerHTML="";platformsLayer.appendChild(el);});}
+function buildItems(){itemsLayer.innerHTML="";items.forEach(item=>{const el=document.createElement("div");el.className="collectible";el.id="item-"+item.id;el.innerHTML=`<div class="objectMiniDesc"><b>${item.name}</b><small>${item.mini}</small></div><img src="${item.icon}" alt="${item.name}">`;el.addEventListener("click",e=>{e.stopPropagation();if(mode==="adventure"&&!paused&&!item.collected)openQuiz(item);});itemsLayer.appendChild(el);});}
+function positionWorld(){document.querySelectorAll(".landmark").forEach(el=>{el.style.left=el.dataset.x+"px";el.style.top=Math.max(90,Math.min(viewH-330,Number(el.dataset.y)))+"px";});items.forEach(item=>{const el=$("item-"+item.id);if(!el)return;el.style.left=item.x+"px";el.style.top=(floorY-item.yOff)+"px";el.style.display=item.collected?"none":"grid";});if(finalOrb){finalOrb.style.left="4525px";finalOrb.style.top=(floorY-360)+"px";const ready=items.every(i=>i.collected);finalOrb.classList.toggle("ready",ready);finalOrb.classList.toggle("locked",!ready);}}
+function resetAdventure(){score=0;lives=3;cameraX=0;jumpQueued=false;hero.x=90;hero.y=floorY-hero.h;hero.vx=0;hero.vy=0;hero.grounded=true;hero.facing=1;items.forEach(i=>i.collected=false);buildItems();positionWorld();updateHud();setHeroState("idle");positionWorld();showMessage("🌞 Ruta viva: recoge todos los objetos y toca la bolita final.");}
+function startAdventure(){resetAdventure();setMode("adventure");}
+function updateHud(){scoreEl.textContent=score;countEl.textContent=items.filter(i=>i.collected).length;heartsEl.textContent="❤️".repeat(lives)+"🤍".repeat(Math.max(0,3-lives));progressEl.style.width=Math.min(100,Math.max(0,hero.x/(WORLD_W-viewW)*100))+"%";}
+function showMessage(text){messageEl.textContent=text;messageEl.style.display="block";clearTimeout(showMessage.timer);showMessage.timer=setTimeout(()=>messageEl.style.display="none",3000);}
+function setHeroImage(img,primary,fallback){
+  if(!img)return;
+  if(img.dataset.primarySource===primary)return;
+  img.dataset.primarySource=primary;
+  img.onerror=()=>{
+    img.onerror=null;
+    if(fallback)img.src=fallback;
+  };
+  img.src=primary;
+}
+function setHeroState(state){
+  heroEl.className="";
+  const skin=heroSkins.inka;
+  if(state==="run")heroEl.classList.add("running");
+  if(state==="jump")heroEl.classList.add("jump");
+  if(state==="win")heroEl.classList.add("happy");
+  const src=skin[state]||skin.idle;
+  setHeroImage(heroEl,src,skin.idle);
+  document.querySelectorAll(".avatar").forEach(a=>setHeroImage(a,skin.idle,skin.idle));
+  const finishHero=$("finishHero");
+  if(finishHero)setHeroImage(finishHero,skin.win,skin.idle);
+  const choice=$("heroChoice");
+  if(choice)choice.textContent="Personaje actual: Explorador Inka";
+}
+function queueJump(){jumpQueued=true;}
+function update(dt){if(!started||paused||mode!=="adventure")return;const gravity=.78,accel=1.35,friction=.84;if(keys.left){hero.vx-=accel;hero.facing=-1;}if(keys.right){hero.vx+=accel;hero.facing=1;}if(!keys.left&&!keys.right)hero.vx*=friction;hero.vx=Math.max(-hero.speed,Math.min(hero.speed,hero.vx));if(jumpQueued&&hero.grounded){hero.vy=hero.jump;hero.grounded=false;jumpQueued=false;sfx("jump");burst(hero.x+hero.w/2,hero.y+hero.h-6,"dust",10);}else if(jumpQueued&&!hero.grounded)jumpQueued=false;hero.vy+=gravity;hero.x+=hero.vx;hero.y+=hero.vy;hero.x=Math.max(25,Math.min(WORLD_W-130,hero.x));resolveCollisions();if(hero.grounded&&Math.abs(hero.vx)>1.1){dustTimer+=dt;if(dustTimer>45){dustTimer=0;burst(hero.x+(hero.facing===1?14:78),hero.y+hero.h-2,"dust",3);}}checkItems();checkFinalOrb();if(Math.abs(hero.vx)>1.1||!hero.grounded){heroTrailTimer+=dt;if(heroTrailTimer>82){heroTrailTimer=0;trailSpark(hero.x+hero.w/2,hero.y+hero.h/2);}}cameraX=Math.max(0,Math.min(WORLD_W-viewW,hero.x-viewW*.36));updateVisuals();updateHud();}
+function resolveCollisions(){hero.grounded=false;const floorTop=floorY-hero.h;if(hero.y>=floorTop){hero.y=floorTop;hero.vy=0;hero.grounded=true;}for(const p of platforms){const heroBottom=hero.y+hero.h,prevBottom=heroBottom-hero.vy,heroRight=hero.x+hero.w,heroLeft=hero.x,pRight=p.x+p.w;const overlapX=heroRight>p.x+8&&heroLeft<pRight-8;const landing=hero.vy>=0&&prevBottom<=p.y+10&&heroBottom>=p.y&&heroBottom<=p.y+40;if(overlapX&&landing){hero.y=p.y-hero.h;hero.vy=0;hero.grounded=true;}}}
+function checkItems(){for(const item of items){if(item.collected)continue;const itemX=item.x+47,itemY=floorY-item.yOff+47,hx=hero.x+hero.w/2,hy=hero.y+hero.h/2;const nearCircle=Math.hypot(hx-itemX,hy-itemY)<132;const nearBox=Math.abs(hx-itemX)<125&&Math.abs(hy-itemY)<135;if(nearCircle||nearBox){openQuiz(item);break;}}}
+function openQuiz(item){if(paused&&currentQuizItem)return;paused=true;currentQuizItem=item;quizImg.src=item.icon;quizTitle.textContent="Objeto: "+item.name;placeDesc.innerHTML=`<span class="tag">Descripción del lugar u objeto</span><br><b>${item.name}:</b> ${item.desc||item.info}`;quizQuestion.textContent=item.q;optionsEl.innerHTML="";item.options.forEach((txt,index)=>{const btn=document.createElement("button");btn.className="optionBtn";btn.textContent=txt;btn.onclick=()=>answerQuiz(item,index);optionsEl.appendChild(btn);});quizScreen.classList.add("active");const card=quizScreen.querySelector(".quizCard");if(card)card.scrollTop=0;setHeroState("point");}
+function answerQuiz(item,selected){quizScreen.classList.remove("active");paused=false;currentQuizItem=null;if(selected===item.answer){item.collected=true;score+=100;sfx("correct");const el=$("item-"+item.id);if(el){el.style.transition=".25s transform,.25s opacity";el.style.transform="scale(1.7) rotate(20deg)";el.style.opacity="0";setTimeout(()=>el.remove(),260);}burst(item.x+47,floorY-item.yOff+47,"spark",18);positionWorld();showMessage(items.every(i=>i.collected)?"✅ ¡Todos los objetos listos! Ahora toca la bolita final.":"✅ Correcto: "+item.info);}else{lives--;sfx("wrong");score=Math.max(0,score-40);showMessage("❌ Casi. Respuesta correcta: "+item.options[item.answer]);if(lives<=0)finishAdventure(false);}updateHud();}
+function burst(x,y,type,count){for(let i=0;i<count;i++){const p=document.createElement("span");p.className=type;p.style.left=x+"px";p.style.top=y+"px";p.style.setProperty("--dx",Math.random()*120-60+"px");p.style.setProperty("--dy",Math.random()*-90-20+"px");fxLayer.appendChild(p);setTimeout(()=>p.remove(),type==="spark"?760:500);}}
+function updateVisuals(){
+  world.style.transform=`translate3d(${-cameraX}px,0,0)`;
+  bg.style.transform=`translate3d(${-cameraX*.025}px,0,0) scale(1.03)`;
+
+  const skin=heroSkins.inka;
+  const mobile=window.innerWidth<=900;
+  const visualHeight=mobile?156:172;
+  const groundOffset=skin.groundOffset||2;
+
+  heroEl.style.width="auto";
+  heroEl.style.height=visualHeight+"px";
+  heroEl.style.left=hero.x+"px";
+  heroEl.style.top=(hero.y+hero.h-visualHeight+groundOffset)+"px";
+  heroEl.style.transform=`scaleX(${hero.facing})`;
+
+  // La llama acompañante usa assets/llama.png y llama_full.png.
+  const llamaHeight=mobile?116:132;
+  const followDistance=118;
+  const rawLlamaX=hero.facing===1
+    ? hero.x-followDistance
+    : hero.x+hero.w+24;
+  const llamaX=Math.max(12,Math.min(WORLD_W-150,rawLlamaX));
+  const companionGround=hero.y+hero.h;
+  llamaEl.style.opacity="1";
+  llamaEl.style.width="auto";
+  llamaEl.style.height=llamaHeight+"px";
+  llamaEl.style.left=llamaX+"px";
+  llamaEl.style.top=(companionGround-llamaHeight+3)+"px";
+  llamaEl.style.transform=`scaleX(${hero.facing})`;
+
+  if(!hero.grounded)setHeroState("jump");
+  else if(Math.abs(hero.vx)>1.1)setHeroState("run");
+  else setHeroState("idle");
+}
+function finishAdventure(won){paused=true;started=false;finishScreen.classList.add("active");sfx(won?"win":"wrong");if(won){finishTitle.textContent="🏆 ¡Misión cumplida!";finishText.textContent=`Aprendiste sobre Cusco y reuniste los 9 objetos culturales. Puntaje final: ${score} puntos.`;setHeroState("win");confetti();}else{finishTitle.textContent="🌄 Inténtalo otra vez";finishText.textContent="Te quedaste sin vidas, pero puedes volver a jugar y seguir aprendiendo sobre la cultura cusqueña.";}}
+
+
+function checkFinalOrb(){
+  if(!finalOrb||!items.every(i=>i.collected))return;
+  const orbX=4525+59,orbY=(floorY-360)+59;
+  const hx=hero.x+hero.w/2,hy=hero.y+hero.h/2;
+  if(Math.hypot(hx-orbX,hy-orbY)<145){
+    burst(orbX,orbY,"spark",36);
+    finishAdventure(true);
+  }
+}
+if(finalOrb){
+  finalOrb.addEventListener("click",()=>{
+    if(items.every(i=>i.collected)){
+      burst(4525+59,(floorY-360)+59,"spark",36);
+      finishAdventure(true);
+    }else{
+      sfx("wrong");showMessage("🔒 Primero recoge y responde todos los objetos culturales.");
+    }
+  });
+}
+function trailSpark(x,y){
+  const p=document.createElement("span");
+  p.className="trailStar";
+  p.style.left=x+"px";
+  p.style.top=y+"px";
+  p.style.setProperty("--dx",(Math.random()*70-35)+"px");
+  p.style.setProperty("--dy",(Math.random()*-45-10)+"px");
+  fxLayer.appendChild(p);
+  setTimeout(()=>p.remove(),700);
+}
+function createAmbient(){
+  if(!ambientLayer)return;
+  ambientLayer.innerHTML="";
+  for(let i=0;i<28;i++){
+    const f=document.createElement("span");
+    f.className="firefly";
+    f.style.left=(Math.random()*100)+"vw";
+    f.style.top=(25+Math.random()*55)+"vh";
+    f.style.setProperty("--dx",(Math.random()*120-60)+"px");
+    f.style.setProperty("--dy",(Math.random()*90-45)+"px");
+    f.style.setProperty("--dur",(5+Math.random()*8)+"s");
+    f.style.animationDelay=(-Math.random()*8)+"s";
+    ambientLayer.appendChild(f);
+  }
+}
+
+
+function updateSoundButton(){
+  const b=$("soundBtn");
+  if(b)b.textContent=soundEnabled?"🔊 Sonido":"🔇 Sonido";
+}
+let audioCtx=null;
+function playTone(freq=440,dur=.12,type="sine",vol=.05){
+  if(!soundEnabled)return;
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.type=type;osc.frequency.value=freq;
+    gain.gain.value=vol;
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+dur);
+    osc.stop(audioCtx.currentTime+dur+.02);
+  }catch(e){}
+}
+function sfx(kind){
+  if(kind==="correct"){playTone(660,.08,"triangle",.055);setTimeout(()=>playTone(880,.10,"triangle",.05),90);}
+  else if(kind==="wrong"){playTone(160,.18,"sawtooth",.04);}
+  else if(kind==="flip"){playTone(420,.06,"square",.035);}
+  else if(kind==="win"){playTone(523,.10,"triangle",.055);setTimeout(()=>playTone(659,.10,"triangle",.055),110);setTimeout(()=>playTone(784,.16,"triangle",.055),220);}
+  else if(kind==="click"){playTone(520,.06,"sine",.035);}
+  else if(kind==="jump"){playTone(360,.07,"triangle",.035);}
+}
+function toggleSound(){
+  soundEnabled=!soundEnabled;
+  localStorage.setItem("cuscoSound",soundEnabled?"on":"off");
+  updateSoundButton();
+  if(soundEnabled)sfx("correct");
+}
+function confetti(){
+  const colors=["#ffd447","#ff6b6b","#5ee37d","#4db7ff","#b66bff","#fff1a8"];
+  for(let i=0;i<70;i++){
+    const c=document.createElement("span");
+    c.className="confettiPiece";
+    c.style.left=(Math.random()*100)+"vw";
+    c.style.setProperty("--x",(Math.random()*180-90)+"px");
+    c.style.setProperty("--dur",(1.5+Math.random()*1.8)+"s");
+    c.style.setProperty("--c",colors[Math.floor(Math.random()*colors.length)]);
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),3600);
+  }
+  const f=document.createElement("div");
+  f.className="screenFlash";
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),700);
+}
+
+/* ===== UTILIDAD PARA MEZCLAR ===== */
+function shuffle(arr){
+  return arr.map(value=>[Math.random(),value]).sort((a,b)=>a[0]-b[0]).map(entry=>entry[1]);
+}
+
+/* ===== JUEGO 2: CARTAS CULTURALES ===== */
+const cultureSource=[
+  {id:"chakana",name:"Chakana",file:"chakana",emoji:"✣",clue:"Soy una cruz andina que representa la unión entre la naturaleza, las personas y el mundo espiritual."},
+  {id:"inti",name:"Inti",file:"inti",emoji:"☀️",clue:"Soy el Sol y para los inkas daba luz, calor y vida a los cultivos."},
+  {id:"llama",name:"Llama",file:"llama_icon",emoji:"🦙",clue:"Soy un animal andino que transportaba carga y también brindaba lana."},
+  {id:"machu",name:"Machu Picchu",file:"machu",emoji:"⛰️",clue:"Soy una famosa ciudadela inka construida entre montañas de la región Cusco."},
+  {id:"maiz",name:"Maíz",file:"maiz",emoji:"🌽",clue:"Soy un alimento andino usado en comidas y bebidas tradicionales."},
+  {id:"plaza",name:"Plaza de Armas",file:"plaza",emoji:"🏛️",clue:"Soy el centro histórico del Cusco, donde se realizan fiestas, desfiles y reuniones."},
+  {id:"qorikancha",name:"Qorikancha",file:"qorikancha",emoji:"🏯",clue:"Fui uno de los templos inkas más importantes y estuve dedicado principalmente al Sol."},
+  {id:"quipu",name:"Quipu",file:"quipu",emoji:"🪢",clue:"Tengo cuerdas y nudos que servían para registrar cantidades e información."},
+  {id:"sacsayhuaman",name:"Sacsayhuamán",file:"sacsayhuaman",emoji:"🧱",clue:"Soy una construcción inka cercana al Cusco, famosa por mis enormes muros de piedra."}
+];
+
+/* Prueba automáticamente varias extensiones y también la carpeta assets principal. */
+function cardImageCandidates(file){
+  return [
+    `assets/cartas/${file}.png`,
+    `assets/cartas/${file}.PNG`,
+    `assets/cartas/${file}.jpg`,
+    `assets/cartas/${file}.jpeg`,
+    `assets/cartas/${file}.webp`,
+    `assets/${file}.png`
+  ];
+}
+function loadCardImage(img,file,emoji="🖼️"){
+  if(!img)return;
+  const candidates=cardImageCandidates(file);
+  let index=0;
+  img.style.display="block";
+  const tryNext=()=>{
+    if(index>=candidates.length){
+      const holder=img.parentElement;
+      img.remove();
+      if(holder&&!holder.querySelector(".missingCardImage")){
+        const fallback=document.createElement("span");
+        fallback.className="missingCardImage";
+        fallback.innerHTML=`<span>${emoji}<small>${file}</small></span>`;
+        holder.prepend(fallback);
+      }
+      return;
+    }
+    img.src=candidates[index++];
+  };
+  img.onerror=tryNext;
+  img.onload=()=>{img.onerror=null;};
+  tryNext();
+}
+function activateCardImages(root=document){
+  root.querySelectorAll("img[data-card-file]").forEach(img=>{
+    loadCardImage(img,img.dataset.cardFile,img.dataset.emoji||"🖼️");
+  });
+}
+
+let cultureOpen=[],cultureLocked=false,culturePairs=0,culturePreviewTimer=null,cultureCountdown=null;
+
+function startQuipu(){
+  clearTimeout(culturePreviewTimer);
+  clearInterval(cultureCountdown);
+  culturePairs=0;
+  cultureOpen=[];
+  cultureLocked=true;
+
+  $("culturePairs").textContent="0";
+  $("cultureHelp").textContent="Observa las 18 cartas frontales. Después de 3 segundos todas mostrarán el reverso.";
+  $("cultureStatus").textContent="👀 Memoriza las imágenes... 3";
+
+  const deck=shuffle([...cultureSource,...cultureSource].map((item,index)=>({
+    ...item,
+    cardId:`${item.id}-${index}`
+  })));
+
+  const grid=$("cultureGrid");
+  grid.innerHTML="";
+
+  deck.forEach(card=>{
+    const el=document.createElement("button");
+    el.type="button";
+    el.className="cultureCard flipped preview disabled";
+    el.dataset.id=card.id;
+    el.setAttribute("aria-label",`Carta de ${card.name}`);
+    el.innerHTML=`
+      <span class="cultureFace cultureBack"><img data-card-file="reverso" data-emoji="☀️" alt="Reverso de carta"></span>
+      <span class="cultureFace cultureFront"><div><img data-card-file="${card.file}" data-emoji="${card.emoji}" alt="${card.name}"><span>${card.name}</span></div></span>`;
+    el.addEventListener("click",()=>flipCultureCard(el));
+    grid.appendChild(el);
+  });
+  activateCardImages(grid);
+
+  let remaining=3;
+  cultureCountdown=setInterval(()=>{
+    remaining--;
+    if(remaining>0 && mode==="quipu") $("cultureStatus").textContent=`👀 Memoriza las imágenes... ${remaining}`;
+    if(remaining<=0) clearInterval(cultureCountdown);
+  },1000);
+
+  culturePreviewTimer=setTimeout(hideCulturePreview,3000);
+}
+
+function hideCulturePreview(){
+  if(mode!=="quipu")return;
+  document.querySelectorAll("#cultureGrid .cultureCard").forEach(card=>{
+    card.classList.remove("flipped","preview","disabled");
+  });
+  cultureLocked=false;
+  $("cultureHelp").textContent="¡Ahora sí! Voltea dos cartas y encuentra las 9 parejas culturales.";
+  $("cultureStatus").textContent="🧠 Busca las parejas";
+  sfx("flip");
+}
+
+function flipCultureCard(card){
+  if(cultureLocked||card.classList.contains("flipped")||card.classList.contains("matched"))return;
+
+  card.classList.add("flipped");
+  sfx("flip");
+  cultureOpen.push(card);
+
+  if(cultureOpen.length!==2)return;
+
+  cultureLocked=true;
+  const [first,second]=cultureOpen;
+
+  if(first.dataset.id===second.dataset.id){
+    first.classList.add("matched");
+    second.classList.add("matched");
+    culturePairs++;
+    $("culturePairs").textContent=culturePairs;
+    cultureOpen=[];
+    cultureLocked=false;
+    sfx("correct");
+
+    if(culturePairs===cultureSource.length){
+      confetti();
+      setTimeout(()=>finishMini("🏆 ¡Cartas completadas!","Encontraste las 9 parejas usando las imágenes de tu carpeta assets/cartas."),650);
+    }
+  }else{
+    setTimeout(()=>{
+      first.classList.remove("flipped");
+      second.classList.remove("flipped");
+      cultureOpen=[];
+      cultureLocked=false;
+    },850);
+  }
+}
+
+/* ===== JUEGO 3: UNE CON LAZOS ===== */
+const associationData=[
+  {id:"cusco",concept:"Cusco",meaning:"Ombligo del mundo"},
+  {id:"manco",concept:"Manco Cápac",meaning:"Fundador del Imperio Inca"},
+  {id:"inti",concept:"Inti",meaning:"Dios del Sol"},
+  {id:"quipu",concept:"Quipu",meaning:"Sistema de cuerdas y nudos"},
+  {id:"machu",concept:"Machu Picchu",meaning:"Ciudadela inka entre montañas"}
+];
+const associationColors=["#e53935","#1e88e5","#43a047","#8e24aa","#fb8c00"];
+let associationSelectedConcept=null,associationSelectedMeaning=null,associationMatches=[],associationBusy=false;
+
+function startClueGame(){
+  associationSelectedConcept=null;
+  associationSelectedMeaning=null;
+  associationMatches=[];
+  associationBusy=false;
+  $("associationPairs").textContent="0";
+  $("associationFeedback").textContent="Todo está desordenado. Selecciona una palabra arriba y su significado abajo.";
+
+  const conceptHolder=$("associationConcepts");
+  const meaningHolder=$("associationMeanings");
+  conceptHolder.innerHTML="";
+  meaningHolder.innerHTML="";
+
+  shuffle([...associationData]).forEach(pair=>{
+    conceptHolder.appendChild(createAssociationNode(pair.id,"concept",pair.concept));
+  });
+  shuffle([...associationData]).forEach(pair=>{
+    meaningHolder.appendChild(createAssociationNode(pair.id,"meaning",pair.meaning));
+  });
+
+  requestAnimationFrame(()=>requestAnimationFrame(drawAssociationLines));
+}
+
+function createAssociationNode(id,side,label){
+  const button=document.createElement("button");
+  button.type="button";
+  button.className="associationNode";
+  button.dataset.id=id;
+  button.dataset.side=side;
+  button.textContent=label;
+  button.addEventListener("click",()=>selectAssociationNode(button));
+  return button;
+}
+
+function selectAssociationNode(button){
+  if(associationBusy||button.classList.contains("matched"))return;
+  const side=button.dataset.side;
+
+  if(side==="concept"){
+    if(associationSelectedConcept)associationSelectedConcept.classList.remove("selected");
+    associationSelectedConcept=button;
+  }else{
+    if(associationSelectedMeaning)associationSelectedMeaning.classList.remove("selected");
+    associationSelectedMeaning=button;
+  }
+  button.classList.add("selected");
+  sfx("click");
+
+  if(!associationSelectedConcept||!associationSelectedMeaning)return;
+  checkAssociationPair();
+}
+
+function checkAssociationPair(){
+  associationBusy=true;
+  const concept=associationSelectedConcept;
+  const meaning=associationSelectedMeaning;
+
+  if(concept.dataset.id===meaning.dataset.id){
+    const pair=associationData.find(item=>item.id===concept.dataset.id);
+    concept.classList.remove("selected");
+    meaning.classList.remove("selected");
+    concept.classList.add("matched");
+    meaning.classList.add("matched");
+    concept.disabled=true;
+    meaning.disabled=true;
+    associationMatches.push({id:pair.id,concept,meaning});
+    $("associationPairs").textContent=associationMatches.length;
+    $("associationFeedback").textContent=`✅ ${pair.concept} se relaciona con “${pair.meaning}”.`;
+    associationSelectedConcept=null;
+    associationSelectedMeaning=null;
+    associationBusy=false;
+    sfx("correct");
+    drawAssociationLines();
+
+    if(associationMatches.length===associationData.length){
+      confetti();
+      setTimeout(()=>finishMini("🏆 ¡Similitudes completadas!","Uniste correctamente los 5 conceptos con sus significados usando lazos."),700);
+    }
+  }else{
+    concept.classList.add("wrong");
+    meaning.classList.add("wrong");
+    $("associationFeedback").textContent="❌ No son similares. Observa bien e inténtalo otra vez.";
+    sfx("wrong");
+    setTimeout(()=>{
+      concept.classList.remove("wrong","selected");
+      meaning.classList.remove("wrong","selected");
+      associationSelectedConcept=null;
+      associationSelectedMeaning=null;
+      associationBusy=false;
+    },700);
+  }
+}
+
+function drawAssociationLines(){
+  const svg=$("associationLines");
+  const stage=$("associationStage");
+  if(!svg||!stage||mode!=="clue")return;
+
+  const stageRect=stage.getBoundingClientRect();
+  svg.setAttribute("viewBox",`0 0 ${stageRect.width} ${stageRect.height}`);
+  svg.innerHTML="";
+
+  associationMatches.forEach((match,index)=>{
+    if(!match.concept.isConnected||!match.meaning.isConnected)return;
+    const a=match.concept.getBoundingClientRect();
+    const b=match.meaning.getBoundingClientRect();
+    const x1=a.left-stageRect.left+a.width/2;
+    const y1=a.bottom-stageRect.top+3;
+    const x2=b.left-stageRect.left+b.width/2;
+    const y2=b.top-stageRect.top-3;
+    const bend=(y1+y2)/2;
+    const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("class","associationLine");
+    path.setAttribute("stroke",associationColors[index%associationColors.length]);
+    path.setAttribute("d",`M ${x1} ${y1} C ${x1} ${bend}, ${x2} ${bend}, ${x2} ${y2}`);
+    svg.appendChild(path);
+  });
+}
+
+function finishMini(title,text){
+  finishTitle.textContent=title;
+  finishText.textContent=text;
+  sfx("win");confetti();
+  finishScreen.classList.add("active");
+}
+/* ===== INPUT / LOOP ===== */
+function loop(t){const dt=Math.min(32,t-lastTime||16);lastTime=t;update(dt);requestAnimationFrame(loop);}function showHow(){showMessage("Hay 3 juegos: salto, cartas de memoria y unión de conceptos con lazos.");}
+addEventListener("keydown",e=>{const k=e.key.toLowerCase();if(k==="arrowleft"||k==="a")keys.left=true;if(k==="arrowright"||k==="d")keys.right=true;if(k==="arrowup"||k==="w"||k===" "){queueJump();e.preventDefault();}});addEventListener("keyup",e=>{const k=e.key.toLowerCase();if(k==="arrowleft"||k==="a")keys.left=false;if(k==="arrowright"||k==="d")keys.right=false;});
+function bindTouch(id,control){const el=$(id);const on=e=>{e.preventDefault();if(control==="jump")queueJump();else keys[control]=true;};const off=e=>{e.preventDefault();if(control!=="jump")keys[control]=false;};el.addEventListener("pointerdown",on);el.addEventListener("pointerup",off);el.addEventListener("pointercancel",off);el.addEventListener("pointerleave",off);}bindTouch("leftBtn","left");bindTouch("rightBtn","right");bindTouch("jumpBtn","jump");
+document.querySelectorAll("[data-start]").forEach(el=>el.addEventListener("click",()=>{const target=el.dataset.start;if(target==="adventure")startAdventure();if(target==="quipu")setMode("quipu");if(target==="clue")setMode("clue");}));document.querySelectorAll("[data-menu]").forEach(el=>el.addEventListener("click",()=>setMode("menu")));$("againBtn").addEventListener("click",()=>{finishScreen.classList.remove("active");if(mode==="adventure")startAdventure();else if(mode==="quipu")setMode("quipu");else if(mode==="clue")setMode("clue");else setMode("menu");});
+const associationPanelEl=$("associationPanel");if(associationPanelEl)associationPanelEl.addEventListener("scroll",()=>requestAnimationFrame(drawAssociationLines));const soundButton=$("soundBtn");if(soundButton)soundButton.addEventListener("click",toggleSound);updateSoundButton();activateCardImages(document);loadLlamaCompanion();addEventListener("resize",resize);createAmbient();buildPlatforms();buildItems();resize();resetAdventure();setMode("menu");requestAnimationFrame(loop);
+</script>
+</body>
+</html>
